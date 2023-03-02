@@ -2,13 +2,14 @@
 """
 Validate if given list of files are encrypted with sops.
 """
-from argparse import ArgumentParser
 import json
+import sys
+from argparse import ArgumentParser
+
 from ruamel.yaml import YAML
 from ruamel.yaml.parser import ParserError
-import sys
 
-yaml = YAML(typ='safe')
+yaml = YAML(typ="safe")
 
 
 def validate_enc(item):
@@ -21,14 +22,17 @@ def validate_enc(item):
     bool, number, etc) also makes the file invalid.
     """
 
+    # pprint(item)
+
     if isinstance(item, str):
-        return item.startswith('ENC[')
+        return item.startswith("ENC[")
     elif isinstance(item, list):
         return all(validate_enc(i) for i in item)
     elif isinstance(item, dict):
         return all(validate_enc(i) for i in item.values())
     else:
         return False
+
 
 def check_file(filename):
     """
@@ -41,7 +45,7 @@ def check_file(filename):
     # JSON outputter uses hard tabs, and since sops is written in go it does the same.
     # So we can't just use a YAML loader here - we use a yaml one if it ends in
     # .yaml, but json otherwise
-    if filename.endswith('.yaml'):
+    if filename.endswith(".yaml"):
         loader_func = yaml.load
     else:
         loader_func = json.load
@@ -53,29 +57,56 @@ def check_file(filename):
             doc = loader_func(f)
         except ParserError:
             # All sops encrypted files are valid JSON or YAML
-            return False, f"{filename}: Not valid JSON or YAML, is not properly encrypted"
+            return (
+                False,
+                f"{filename}: Not valid JSON or YAML, is not properly encrypted",
+            )
 
-    if 'sops' not in doc:
+    if "sops" not in doc:
         # sops puts a `sops` key in the encrypted output. If it is not
         # present, very likely the file is not encrypted.
-        return False, f"{filename}: sops metadata key not found in file, is not properly encrypted"
+        return (
+            False,
+            f"{filename}: sops metadata key not found in file, is not properly encrypted",
+        )
 
     invalid_keys = []
+
+    loader_func = yaml.load
+    encrypted_regex = []
+
+    sops_config = ".sops.yaml"
+    try:
+        with open(sops_config) as sc:
+            try:
+                config = loader_func(sc)
+            except ParserError:
+                return False, f"{sops_config} is not readable"
+        encrypted_regex = (
+            (config["creation_rules"][0]["encrypted_regex"]).strip("'$^()").split("|")
+        )
+    except IOError:
+        pass
+
     for k in doc:
-        if k != 'sops':
+        if k != "sops" and (k in encrypted_regex or not encrypted_regex):
             # Values under the `sops` key are not encrypted.
             if not validate_enc(doc[k]):
                 # Collect all invalid keys so we can provide useful error message
                 invalid_keys.append(k)
 
     if invalid_keys:
-        return False, f"{filename}: Unencrypted values found nested under keys: {','.join(invalid_keys)}"
+        return (
+            False,
+            f"{filename}: Unencrypted values found nested under keys: {','.join(invalid_keys)}",
+        )
 
     return True, f"{filename}: Valid encryption"
 
+
 def main():
     argparser = ArgumentParser()
-    argparser.add_argument('filenames', nargs='+')
+    argparser.add_argument("filenames", nargs="+")
 
     args = argparser.parse_args()
 
@@ -88,10 +119,11 @@ def main():
             failed_messages.append(message)
 
     if failed_messages:
-        print('\n'.join(failed_messages))
+        print("\n".join(failed_messages))
         return 1
 
     return 0
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     sys.exit(main())
