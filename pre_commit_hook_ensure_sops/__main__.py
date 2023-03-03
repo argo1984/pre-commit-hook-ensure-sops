@@ -52,7 +52,7 @@ def check_file(filename):
     # sops doesn't have a --verify (https://github.com/mozilla/sops/issues/437)
     # so we implement some heuristics, primarily to guard against unencrypted
     # files being checked in.
-    with open(filename) as f:
+    with open(filename, encoding="utf-8") as f:
         try:
             doc = loader_func(f)
         except ParserError:
@@ -77,7 +77,7 @@ def check_file(filename):
 
     sops_config = ".sops.yaml"
     try:
-        with open(sops_config) as sc:
+        with open(sops_config, encoding="utf-8") as sc:
             try:
                 config = loader_func(sc)
             except ParserError:
