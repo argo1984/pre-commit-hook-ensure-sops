@@ -22,7 +22,7 @@ def validate_enc(item):
     bool, number, etc) also makes the file invalid except an empty
     string which would pass the encryption check.
     """
-    
+
     if isinstance(item, str):
         if item == "" or item.startswith('ENC['):
             return True
