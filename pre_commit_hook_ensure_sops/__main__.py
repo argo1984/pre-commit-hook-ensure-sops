@@ -85,7 +85,7 @@ def check_file(filename):
         encrypted_regex = (
             (config["creation_rules"][0]["encrypted_regex"]).strip("'$^()").split("|")
         )
-    except IOError:
+    except Exception:
         pass
 
     for k in doc:
